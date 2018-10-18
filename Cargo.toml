@@ -1,0 +1,6 @@
+[package]
+name = "silver-chainsaw"
+version = "0.1.0"
+authors = ["Frederik Braun <fbraun@mozilla.com>"]
+
+[dependencies]
