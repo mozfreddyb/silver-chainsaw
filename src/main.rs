@@ -1,5 +1,5 @@
-mod policytypes;
+mod parsing;
 
 fn main() {
-    println!("{}", policytypes::typefromid(9));;
+    println!("{}", parsing::typefromid(9));;
 }
