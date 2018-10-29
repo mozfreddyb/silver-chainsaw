@@ -1,5 +1,5 @@
 mod parsing;
 
 fn main() {
-    println!("{}", parsing::typefromid(9));;
+    println!("{}", parsing::parse_into_contentpolicytype(9));;
 }

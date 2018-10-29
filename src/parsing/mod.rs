@@ -1,4 +1,4 @@
-pub fn typefromid(id: usize) -> &'static str {
+pub fn parse_into_contentpolicytype(id: usize) -> &'static str {
     let policytypes = include!("policytypes.in");
     if id < policytypes.len() {
         policytypes[id]
