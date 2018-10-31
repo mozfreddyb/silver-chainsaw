@@ -1,5 +1,8 @@
+use std::str::FromStr;
+use std::fmt;
 use super::regex::Regex;
 use super::serde_json::{Value, Error};
+use super::serde::de::{Deserialize, Deserializer, Visitor, Unexpected};
 use super::url::{ParseError, Url};
 
 
@@ -43,7 +46,7 @@ mod tests {
     }
 }
 
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Serialize)]
 pub enum Principal {
     URLPrincipal(String),
     ///XXX decide whether we need URL parsing/validation
@@ -53,32 +56,85 @@ pub enum Principal {
     NullPtr,
 }
 
-pub fn parse_into_principal(text: &str) -> Result<Principal, &'static str> {
-    match text {
-        "SystemPrincipal" => Ok(Principal::SystemPrincipal),
-        "NullPrincipal" => Ok(Principal::NullPrincipal),
-        "nullptr" => Ok(Principal::NullPtr),
-        other => {
-            // parse URL
-            //if starts with [Expa]
-            if text.starts_with("[Expanded Principal [") && text.ends_with("]]") {
-                let mut principals: Vec<Principal> = vec![];
-                let str_len = text.len();
-                let inner = &text[21..str_len - 2];
-                for value in inner.split(' ') {
-                    let p = match parse_into_principal(value) {
-                        Ok(innerprincipal) => innerprincipal,
-                        Err(_) => return Err("Error parsing inner principal in Expanded Principal"),
-                    };
-                    principals.push(p);
+impl<'de> Deserialize<'de> for Principal {
+    #[inline]
+    fn deserialize<D>(deserializer: D) -> Result<Principal, D::Error>
+        where
+            D: Deserializer<'de>,
+    {
+        struct PrincipalVisitor;
+
+        impl<'de> Visitor<'de> for PrincipalVisitor {
+            type Value = Principal;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("a JSON Principal")
+            }
+
+            fn visit_str<E>(self, value: &str) -> Result<Principal, E>
+                where
+                    E: serde::de::Error,
+            {
+                //Principal::from_str(value)
+                match Principal::from_str(value) {
+                    Ok(p) => Ok(p),
+                    Err(e) => {
+                        println!("err {}", e);
+                        Err(serde::de::Error::custom("not a JSON Principal"))
+                    }
                 }
-                Ok(Principal::ExpandedPrincipal(principals))
-            } else {
-                let url = Url::parse(other);
-                if url.is_ok() {
-                    Ok(Principal::URLPrincipal(url.unwrap().into_string()))
+            }
+
+            /*#[cfg(feature = "arbitrary_precision")]
+            #[inline]
+            fn visit_map<V>(self, mut visitor: V) -> Result<Principal, V::Error>
+            where
+                V: de::MapAccess<'de>,
+            {
+                let value = visitor.next_key::<PrincipalKey>()?;
+                if value.is_none() {
+                    return Err(de::Error::invalid_type(Unexpected::Map, &self));
+                }
+                let v: PrincipalFromString = visitor.next_value()?;
+                Ok(v.value)
+            }*/
+        }
+
+        deserializer.deserialize_any(PrincipalVisitor)
+    }
+}
+
+impl FromStr for Principal {
+    type Err = Error;
+
+    fn from_str(text: &str) -> Result<Self, Self::Err> { // serde::de::Error
+        match text {
+            "SystemPrincipal" => Ok(Principal::SystemPrincipal),
+            "NullPrincipal" => Ok(Principal::NullPrincipal),
+            "nullptr" => Ok(Principal::NullPtr),
+            prin_str => {
+                // parse URL
+                //if starts with [Expa]
+                if prin_str.starts_with("[Expanded Principal [") && prin_str.ends_with("]]") {
+                    let mut principals: Vec<Principal> = vec![];
+                    let str_len = prin_str.len();
+                    let inner = &prin_str[21..str_len - 2];
+                    for value in inner.split(' ') {
+                        let p = Principal::from_str(value);
+                        if p.is_ok() {
+                            principals.push(p.unwrap());
+                        } else {
+                            panic!("Error parsing inner principal in Expanded Principal: {}", &value);
+                        }
+                    }
+                    Ok(Principal::ExpandedPrincipal(principals))
                 } else {
-                    Err("Error parsing into principal")
+                    let url = Url::parse(prin_str);
+                    if url.is_ok() {
+                        Ok(Principal::URLPrincipal(url.unwrap().into_string()))
+                    } else {
+                        Err(serde::de::Error::invalid_type(Unexpected::Str("Error parsing into principal"), &prin_str))
+                    }
                 }
             }
         }
@@ -162,12 +218,9 @@ pub enum ProcessType {
 pub struct ContentSecurityCheck {
     channeluri: String,
     http_method: String,
-    loadingprincipal: String,
-    // Principal,
-    triggeringprincipal: String,
-    // Principal,
-    principaltoinherit: String,
-    // Principal,
+    loadingprincipal: Principal,
+    triggeringprincipal: Principal,
+    principaltoinherit: Principal,
     redirectchain: Vec<String>,
     internalcontentpolicytype: u64,
     externalcontentpolicytype: u64,
@@ -183,7 +236,8 @@ pub fn parse_log(text: &str, outfile: File) {
     let mut blocks: Vec<ContentSecurityCheck> = vec![];
     let mut current_block: Vec<String> = vec![];
     let is_csmlog_line = Regex::new(r"\[(Parent|Child) \d+: Main Thread]: \w+/CSMLog (.*)").unwrap();
-    let needs_quotes = Regex::new(r"\s+(?P<key>[^:>]+):\s+(?P<value>\S+)").unwrap();
+    let needs_quotes = Regex::new(r"\s+(?P<key>[^:>]+):\s+(?P<value>.+)").unwrap();
+    // used [a-zA-Z0-9?&#:/.\-_ \[\]] instead of .+ for value, looked to brittle.
     let mut collected_security_flags: Vec<String> = vec![];
     let mut collected_redirect_chain: Vec<String> = vec![];
     for line in lines {
@@ -217,13 +271,14 @@ pub fn parse_log(text: &str, outfile: File) {
                 let parsed_json = serde_json::from_str(&json);
                 if parsed_json.is_ok() {
                     let block = parsed_json.unwrap();
-                    println!("\n\nBlock {:?}", &block);
+                    println!("{}", serde_json::to_string(&block).unwrap());
+                    //println!("\n\nBlock {:?}", &block);
                     blocks.push(block);
                     current_block = vec![];
                     collected_security_flags = vec![];
                     collected_redirect_chain = vec![];
                 } else {
-                    panic!("Couldnt parse json. boo. {:?}", parsed_json);
+                    panic!("Couldnt parse json: {:?}", parsed_json);
                 }
             } else if logged_line.contains("->:") {
                 // RedirectChain and securityFlags have items below, cant just be quoted values.
