@@ -150,8 +150,6 @@ mod tests_pip {
 }
 
 
-
-
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub enum ProcessType {
     ParentProcess,
@@ -162,9 +160,12 @@ pub enum ProcessType {
 pub struct ContentSecurityCheck {
     channeluri: String,
     http_method: String,
-    loadingprincipal: String, // Principal,
-    triggeringprincipal: String, // Principal,
-    principaltoinherit: String, // Principal,
+    loadingprincipal: String,
+    // Principal,
+    triggeringprincipal: String,
+    // Principal,
+    principaltoinherit: String,
+    // Principal,
     redirectchain: Vec<String>,
     internalcontentpolicytype: u64,
     externalcontentpolicytype: u64,
@@ -173,7 +174,6 @@ pub struct ContentSecurityCheck {
     enforcesecurity: bool,
     securityflags: Vec<String>,
 }
-
 
 
 pub fn parse_log(text: &str, outfile: File) {
@@ -191,18 +191,17 @@ pub fn parse_log(text: &str, outfile: File) {
             let logged_line = captures.unwrap().get(2).unwrap().as_str(); //XXX
             let quotes_required = needs_quotes.captures(logged_line);
             if quotes_required.is_some() {
-                let caps= quotes_required.unwrap();
+                let caps = quotes_required.unwrap();
                 let key = caps.get(1).unwrap().as_str(); //XXX
                 let value = caps.get(2).unwrap().as_str(); //XXX
                 // numeric value?
                 let is_numeric = value.parse::<u64>();
-                                // quote both:
-                let quoted_line : String;
-                if is_numeric.is_ok() || value == "true" || value == "false" {
-                    quoted_line = format!("\"{}\": {}", key.to_lowercase().replace(" ","_"), value);
+                // quote both:
+                let quoted_line = if is_numeric.is_ok() || value == "true" || value == "false" {
+                    format!("\"{}\": {}", key.to_lowercase().replace(" ", "_"), value)
                 } else {
-                    quoted_line = format!("\"{}\": \"{}\"", key.to_lowercase().replace(" ","_"), value);
-                }
+                    format!("\"{}\": \"{}\"", key.to_lowercase().replace(" ", "_"), value)
+                };
                 current_block.push(quoted_line);
             } else if line.ends_with('}') {
                 // next block
@@ -221,27 +220,20 @@ pub fn parse_log(text: &str, outfile: File) {
                     current_block = vec![];
                     collected_security_flags = vec![];
                     collected_redirect_chain = vec![];
-                    }
-                else {
+                } else {
                     panic!("Couldnt parse json. boo. {:?}", parsed_json);
                 }
-            } else {
+            } else if logged_line.contains("->:") {
                 // RedirectChain and securityFlags have items below, cant just be quoted values.
                 // need to collect array values
-                if logged_line.contains("->:") {
-                    collected_redirect_chain.push(format!("\"{}\"", logged_line.replace("->:","").trim()));
-                }
-                else if logged_line.contains("SEC_") {
-                    collected_security_flags.push(format!("\"{}\"", logged_line.trim()));
+                collected_redirect_chain.push(format!("\"{}\"", logged_line.replace("->:", "").trim()));
+            } else if logged_line.contains("SEC_") {
+                collected_security_flags.push(format!("\"{}\"", logged_line.trim()));
             }
         }
+
+        //blocks
     }
-
-    //blocks
-}
-
-
-
 }
 
 //pub fn parse
