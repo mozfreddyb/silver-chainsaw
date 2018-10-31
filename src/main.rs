@@ -6,16 +6,30 @@ extern crate serde;
 extern crate serde_json;
 extern crate url;
 
-
+use std::env;
 use std::fs::File;
 use std::io::prelude::*;
 
 mod parsing;
 
-fn main() -> Result<(), Box<std::error::Error + 'static>>{
-    let mut outfile = File::create("parsed.out").unwrap();
+fn print_usage(program: &str) {
+    println!("Usage: {} <filename>", program);
+}
 
-    let mut logfile = File::open("csmlog.txt").unwrap(); //XXX arg
+fn main() -> Result<(), Box<std::error::Error + 'static>>{
+ // arg parsing
+    let args: Vec<_> = env::args().collect();
+    let program = args[0].clone();
+    if args.len() == 1 {
+        print_usage(&program);
+        return Ok(());
+    }
+    let file_name = &args[1];
+    //let outfile_name = args[-1];
+
+    let outfile = File::create("parsed.json").unwrap();
+
+    let mut logfile = File::open(file_name).unwrap(); //XXX arg
     let mut contents = String::new();
     logfile.read_to_string(&mut contents)?;
     parsing::parse_log(&contents, outfile);

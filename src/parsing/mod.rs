@@ -4,7 +4,7 @@ use super::regex::Regex;
 pub mod principal;
 
 use std::fs::File;
-
+use std::io::Write;
 
 pub fn parse_into_contentpolicytype(id: usize) -> &'static str {
     let policytypes = include!("policytypes.in");
@@ -61,7 +61,7 @@ pub struct ContentSecurityCheck {
 }
 
 
-pub fn parse_log(text: &str, outfile: File) {
+pub fn parse_log(text: &str, mut outfile: File) {
     let lines = text.split('\n');
     let mut blocks: Vec<ContentSecurityCheck> = vec![];
     let mut current_block: Vec<String> = vec![];
@@ -112,7 +112,6 @@ pub fn parse_log(text: &str, outfile: File) {
                 let parsed_json = serde_json::from_str(&json);
                 if parsed_json.is_ok() {
                     let block = parsed_json.unwrap();
-                    println!("{}", serde_json::to_string(&block).unwrap());
                     //println!("\n\nBlock {:?}", &block);
                     blocks.push(block);
                     current_block = vec![];
@@ -129,9 +128,11 @@ pub fn parse_log(text: &str, outfile: File) {
                 collected_security_flags.push(format!("\"{}\"", logged_line.trim()));
             }
         }
-
-        //blocks
     }
+    let blocks_as_json = serde_json::to_string(&blocks).unwrap();
+    println!("Finished parsing {} blocks.\nWritten to parsed.json.", blocks.len());
+    //println!("{:?}", blocks_as_json);
+    outfile.write(blocks_as_json.as_bytes());
 }
 
 //pub fn parse
