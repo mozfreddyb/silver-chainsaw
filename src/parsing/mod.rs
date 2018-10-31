@@ -85,66 +85,68 @@ pub fn parse_into_principal(text: &str) -> Result<Principal, &'static str> {
     }
 }
 
+
 #[cfg(test)]
-mod tests_pip {
-    use parsing::{parse_into_principal, Principal};
+mod tests_principal_from_str {
+    use parsing::Principal;
+    use std::str::FromStr;
 
     #[test]
     fn parse_http_url() {
         assert_eq!(
-            parse_into_principal("http://example.com/"),
-            Ok(Principal::URLPrincipal("http://example.com/".to_string()))
+            Principal::from_str("http://example.com/").unwrap(),
+            Principal::URLPrincipal("http://example.com/".to_string())
         );
     }
 
     #[test]
     fn parse_about_url() {
         assert_eq!(
-            parse_into_principal("about:config"),
-            Ok(Principal::URLPrincipal("about:config".to_string()))
+            Principal::from_str("about:config").unwrap(),
+            Principal::URLPrincipal("about:config".to_string())
         );
     }
 
     #[test]
     fn parse_null_principal() {
         assert_eq!(
-            parse_into_principal("NullPrincipal"),
-            Ok(Principal::NullPrincipal)
+            Principal::from_str("NullPrincipal").unwrap(),
+            Principal::NullPrincipal
         );
     }
 
     #[test]
     fn parse_nullptr_principal() {
-        assert_eq!(parse_into_principal("nullptr"), Ok(Principal::NullPtr));
+        assert_eq!(Principal::from_str("nullptr").unwrap(), Principal::NullPtr);
     }
 
     #[test]
     fn parse_expanded_principal_1() {
         assert_eq!(
-            parse_into_principal("[Expanded Principal [https://example.com/]]"),
-            Ok(Principal::ExpandedPrincipal(vec![Principal::URLPrincipal(
+            Principal::from_str("[Expanded Principal [https://example.com/]]").unwrap(),
+            Principal::ExpandedPrincipal(vec![Principal::URLPrincipal(
                 "https://example.com/".to_string()
-            )]))
+            )])
         );
     }
 
     #[test]
     fn parse_expanded_principal_2() {
         assert_eq!(
-            parse_into_principal("[Expanded Principal [moz-extension://3767278d-dead-beef-be81-c0ffeec0ffee/ https://example.com/]]"),
-            Ok(Principal::ExpandedPrincipal(vec![
+            Principal::from_str("[Expanded Principal [moz-extension://3767278d-dead-beef-be81-c0ffeec0ffee/ https://example.com/]]").unwrap(),
+            Principal::ExpandedPrincipal(vec![
                 Principal::URLPrincipal("moz-extension://3767278d-dead-beef-be81-c0ffeec0ffee/".to_string()),
-                Principal::URLPrincipal("https://example.com/".to_string())]))
+                Principal::URLPrincipal("https://example.com/".to_string())])
         );
     }
 
     #[test]
     fn parse_expanded_principal_2_preserves_order() {
         assert_eq!(
-            parse_into_principal("[Expanded Principal [https://example.com/ moz-extension://3767278d-dead-beef-be81-c0ffeec0ffee/]]"),
-            Ok(Principal::ExpandedPrincipal(vec![
+            Principal::from_str("[Expanded Principal [https://example.com/ moz-extension://3767278d-dead-beef-be81-c0ffeec0ffee/]]").unwrap(),
+            Principal::ExpandedPrincipal(vec![
                 Principal::URLPrincipal("https://example.com/".to_string()),
-                Principal::URLPrincipal("moz-extension://3767278d-dead-beef-be81-c0ffeec0ffee/".to_string())]))
+                Principal::URLPrincipal("moz-extension://3767278d-dead-beef-be81-c0ffeec0ffee/".to_string())])
         );
     }
 }
