@@ -57,8 +57,8 @@ pub struct ContentSecurityCheck {
     triggeringprincipal: principal::Principal,
     principaltoinherit: principal::Principal,
     redirectchain: Vec<String>,
-    internalcontentpolicytype: u64,
-    externalcontentpolicytype: u64,
+    internalcontentpolicytype: String,
+    externalcontentpolicytype: String,
     upgradeinsecurerequests: bool,
     initalsecuritychecksdone: bool,
     enforcesecurity: bool,
@@ -84,16 +84,23 @@ pub fn parse_log(text: &str, outfile: File) {
             if quotes_required.is_some() {
                 let caps = quotes_required.unwrap();
                 let key = caps.get(1).unwrap().as_str(); //XXX
+                let normalized_key = key.to_lowercase().replace(" ", "_");
                 let value = caps.get(2).unwrap().as_str(); //XXX
                 // numeric value?
-                let is_numeric = value.parse::<u64>();
-                // quote both:
-                let quoted_line = if is_numeric.is_ok() || value == "true" || value == "false" {
-                    format!("\"{}\": {}", key.to_lowercase().replace(" ", "_"), value)
+                let is_numeric = value.parse::<usize>();
+                // enquote both:
+                let enquoted_line = if is_numeric.is_ok() {
+                    if normalized_key.ends_with("contentpolicytype") {
+                        format!("\"{}\": \"{}\"", normalized_key, parse_into_contentpolicytype(is_numeric.unwrap()))
+                    } else {
+                        format!("\"{}\": {}", normalized_key, value)
+                    }
+                } else if value == "true" || value == "false"{
+                     format!("\"{}\": {}", normalized_key, value)
                 } else {
-                    format!("\"{}\": \"{}\"", key.to_lowercase().replace(" ", "_"), value)
+                    format!("\"{}\": \"{}\"", normalized_key, value)
                 };
-                current_block.push(quoted_line);
+                current_block.push(enquoted_line);
             } else if line.ends_with('}') {
                 // next block
                 let secflags = format!("\"securityflags\": [{}]", collected_security_flags.join(","));
