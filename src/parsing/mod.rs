@@ -44,13 +44,8 @@ mod tests {
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
-pub enum ProcessType {
-    ParentProcess,
-    ChildProcess,
-}
-
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct ContentSecurityCheck {
+    processtype: String,
     channeluri: String,
     http_method: String,
     loadingprincipal: principal::Principal,
@@ -75,11 +70,14 @@ pub fn parse_log(text: &str, outfile: File) {
     // used [a-zA-Z0-9?&#:/.\-_ \[\]] instead of .+ for value, looked to brittle.
     let mut collected_security_flags: Vec<String> = vec![];
     let mut collected_redirect_chain: Vec<String> = vec![];
+    let mut processtype : &str;
     for line in lines {
         let captures = is_csmlog_line.captures(line);
         // 0 = all, 1 = parend/child, 2 = after CSMLog
         if captures.is_some() {
-            let logged_line = captures.unwrap().get(2).unwrap().as_str(); //XXX
+            let caps = captures.unwrap();
+            processtype = caps.get(1).unwrap().as_str();
+            let logged_line = caps.get(2).unwrap().as_str(); //XXX
             let quotes_required = needs_quotes.captures(logged_line);
             if quotes_required.is_some() {
                 let caps = quotes_required.unwrap();
@@ -102,6 +100,7 @@ pub fn parse_log(text: &str, outfile: File) {
                 };
                 current_block.push(enquoted_line);
             } else if line.ends_with('}') {
+                current_block.push(format!("\"processtype\": \"{}\"", processtype));
                 // next block
                 let secflags = format!("\"securityflags\": [{}]", collected_security_flags.join(","));
                 current_block.push(secflags);
