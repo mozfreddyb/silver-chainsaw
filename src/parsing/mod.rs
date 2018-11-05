@@ -56,6 +56,7 @@ pub struct ContentSecurityCheck {
     initalsecuritychecksdone: bool,
     enforcesecurity: bool,
     securityflags: Vec<String>,
+    csp: Vec<String>
 }
 
 
@@ -68,6 +69,7 @@ pub fn parse_log(text: &str, verbosity: u8, mut outfile: std::boxed::Box<dyn std
     // used [a-zA-Z0-9?&#:/.\-_ \[\]] instead of .+ for value, looked to brittle.
     let mut collected_security_flags: Vec<String> = vec![];
     let mut collected_redirect_chain: Vec<String> = vec![];
+    let mut collected_csp : Vec<String> = vec![];
     let mut processtype: &str;
     for line in lines {
         let captures = is_csmlog_line.captures(line);
@@ -91,8 +93,8 @@ pub fn parse_log(text: &str, verbosity: u8, mut outfile: std::boxed::Box<dyn std
                     } else {
                         format!("\"{}\": {}", normalized_key, value)
                     }
-                } else if value == "true" || value == "false"{
-                     format!("\"{}\": {}", normalized_key, value)
+                } else if value == "true" || value == "false" {
+                    format!("\"{}\": {}", normalized_key, value)
                 } else {
                     format!("\"{}\": \"{}\"", normalized_key, value)
                 };
@@ -102,8 +104,12 @@ pub fn parse_log(text: &str, verbosity: u8, mut outfile: std::boxed::Box<dyn std
                 // next block
                 let secflags = format!("\"securityflags\": [{}]", collected_security_flags.join(","));
                 current_block.push(secflags);
+
                 let redirects = format!("\"redirectchain\": [{}]", collected_redirect_chain.join(","));
                 current_block.push(redirects);
+
+                let csp = format!("\"csp\": [{}]", collected_csp.join(","));
+                current_block.push(csp);
 
                 let json = format!("{{  {}  }}", current_block.join(","));
                 //eprintln!("JSON attempt {}", &json);
@@ -115,6 +121,7 @@ pub fn parse_log(text: &str, verbosity: u8, mut outfile: std::boxed::Box<dyn std
                     current_block = vec![];
                     collected_security_flags = vec![];
                     collected_redirect_chain = vec![];
+                    collected_csp = vec![];
                 } else {
                     eprintln!("this should be json {}", &json);
                     panic!("Couldnt parse json: {:?}", parsed_json);
@@ -125,6 +132,8 @@ pub fn parse_log(text: &str, verbosity: u8, mut outfile: std::boxed::Box<dyn std
                 collected_redirect_chain.push(format!("\"{}\"", logged_line.replace("->:", "").trim()));
             } else if logged_line.contains("SEC_") {
                 collected_security_flags.push(format!("\"{}\"", logged_line.trim()));
+            } else if logged_line.starts_with("    ") { //FIXME dangerous pattern. get smarter.
+                collected_csp.push(format!("\"{}\"", logged_line.trim()));
             }
         }
     }
