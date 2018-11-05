@@ -1,10 +1,8 @@
 use super::regex::Regex;
 
-
 pub mod principal;
 
-use std::fs::File;
-use std::io::Write;
+use std::io::{Write, ErrorKind};
 
 pub fn parse_into_contentpolicytype(id: usize) -> &'static str {
     let policytypes = include!("policytypes.in");
@@ -61,7 +59,7 @@ pub struct ContentSecurityCheck {
 }
 
 
-pub fn parse_log(text: &str, mut outfile: File) {
+pub fn parse_log(text: &str, verbosity: u8, mut outfile: std::boxed::Box<dyn std::io::Write>) -> std::io::Result<()> {
     let lines = text.split('\n');
     let mut blocks: Vec<ContentSecurityCheck> = vec![];
     let mut current_block: Vec<String> = vec![];
@@ -70,7 +68,7 @@ pub fn parse_log(text: &str, mut outfile: File) {
     // used [a-zA-Z0-9?&#:/.\-_ \[\]] instead of .+ for value, looked to brittle.
     let mut collected_security_flags: Vec<String> = vec![];
     let mut collected_redirect_chain: Vec<String> = vec![];
-    let mut processtype : &str;
+    let mut processtype: &str;
     for line in lines {
         let captures = is_csmlog_line.captures(line);
         // 0 = all, 1 = parend/child, 2 = after CSMLog
@@ -108,16 +106,17 @@ pub fn parse_log(text: &str, mut outfile: File) {
                 current_block.push(redirects);
 
                 let json = format!("{{  {}  }}", current_block.join(","));
-                //println!("JSON attempt {}", &json);
+                //eprintln!("JSON attempt {}", &json);
                 let parsed_json = serde_json::from_str(&json);
                 if parsed_json.is_ok() {
                     let block = parsed_json.unwrap();
-                    //println!("\n\nBlock {:?}", &block);
+                    //eprintln!("\n\nBlock {:?}", &block);
                     blocks.push(block);
                     current_block = vec![];
                     collected_security_flags = vec![];
                     collected_redirect_chain = vec![];
                 } else {
+                    eprintln!("this should be json {}", &json);
                     panic!("Couldnt parse json: {:?}", parsed_json);
                 }
             } else if logged_line.contains("->:") {
@@ -130,9 +129,18 @@ pub fn parse_log(text: &str, mut outfile: File) {
         }
     }
     let blocks_as_json = serde_json::to_string(&blocks).unwrap();
-    println!("Finished parsing {} blocks.\nWritten to parsed.json.", blocks.len());
-    //println!("{:?}", blocks_as_json);
-    outfile.write(blocks_as_json.as_bytes());
+    //println!("Finished parsing {} blocks.\nWritten to parsed.json.", blocks.len());
+    if verbosity >= 1 {
+        eprintln!("{:?}", blocks_as_json);
+    }
+
+    let bytes = blocks_as_json.as_bytes();
+    match outfile.write(bytes) {
+        Ok(size) if size == bytes.len() => Ok(()),
+        Ok(0) | Ok(3) => Err(std::io::Error::new(ErrorKind::WriteZero, "Wrote only 0 bytes")),
+        Ok(_) => Err(std::io::Error::new(ErrorKind::Other, "Couldnt write file completely")),
+        Err(e) => Err(e),
+    }
 }
 
 //pub fn parse
