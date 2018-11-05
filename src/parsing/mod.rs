@@ -99,7 +99,7 @@ pub fn parse_log(text: &str, verbosity: u8, mut outfile: std::boxed::Box<dyn std
                     format!("\"{}\": \"{}\"", normalized_key, value)
                 };
                 current_block.push(enquoted_line);
-            } else if line.ends_with('}') {
+            } else if logged_line == "}" {
                 current_block.push(format!("\"processtype\": \"{}\"", processtype));
                 // next block
                 let secflags = format!("\"securityflags\": [{}]", collected_security_flags.join(","));
