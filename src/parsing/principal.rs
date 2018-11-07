@@ -101,6 +101,34 @@ impl FromStr for Principal {
 }
 
 
+impl fmt::Display for Principal {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let s: String = match self {
+            Principal::SystemPrincipal => "SystemPrincipal".into(),
+            Principal::NullPrincipal => "NullPrincipal".into(),
+            Principal::NullPtr => "nullptr".into(),
+            Principal::ExpandedPrincipal(v) => {
+                let mut t = "[Expanded Principal [".to_string();
+                let mut i = v.len();
+                for u in v {
+                    t.push_str(&(u.to_string()));
+                    if i > 1 {
+                        t.push(' ');
+
+                    }
+                    i -= 1;
+                }
+                t.push_str("]]");
+                t
+
+            },
+            Principal::URLPrincipal(u) => u.clone(),
+        };
+        write!(f, "{}", s)
+    }
+}
+
+
 #[cfg(test)]
 mod tests_principal_from_str {
     use super::Principal;
@@ -164,4 +192,71 @@ mod tests_principal_from_str {
                 Principal::URLPrincipal("moz-extension://3767278d-dead-beef-be81-c0ffeec0ffee/".to_string())])
         );
     }
+
+}
+
+
+#[cfg(test)]
+mod tests_principal_to_str {
+    use super::Principal;
+
+    #[test]
+    fn parse_http_url() {
+        assert_eq!(
+            "http://example.com/",
+            Principal::URLPrincipal("http://example.com/".to_string()).to_string()
+        );
+    }
+
+    #[test]
+    fn parse_about_url() {
+        assert_eq!(
+            "about:config",
+            Principal::URLPrincipal("about:config".to_string()).to_string()
+        );
+    }
+
+    #[test]
+    fn parse_null_principal() {
+        assert_eq!(
+            "NullPrincipal",
+            Principal::NullPrincipal.to_string()
+        );
+    }
+
+    #[test]
+    fn parse_nullptr_principal() {
+        assert_eq!("nullptr", Principal::NullPtr.to_string());
+    }
+
+    #[test]
+    fn parse_expanded_principal_1() {
+        assert_eq!(
+            "[Expanded Principal [https://example.com/]]",
+            Principal::ExpandedPrincipal(vec![Principal::URLPrincipal(
+                "https://example.com/".to_string()
+            )]).to_string()
+        );
+    }
+
+    #[test]
+    fn parse_expanded_principal_2() {
+        assert_eq!(
+            "[Expanded Principal [moz-extension://3767278d-dead-beef-be81-c0ffeec0ffee/ https://example.com/]]",
+            Principal::ExpandedPrincipal(vec![
+                Principal::URLPrincipal("moz-extension://3767278d-dead-beef-be81-c0ffeec0ffee/".to_string()),
+                Principal::URLPrincipal("https://example.com/".to_string())]).to_string()
+        );
+    }
+
+    #[test]
+    fn parse_expanded_principal_2_preserves_order() {
+        assert_eq!(
+            "[Expanded Principal [https://example.com/ moz-extension://3767278d-dead-beef-be81-c0ffeec0ffee/]]",
+            Principal::ExpandedPrincipal(vec![
+                Principal::URLPrincipal("https://example.com/".to_string()),
+                Principal::URLPrincipal("moz-extension://3767278d-dead-beef-be81-c0ffeec0ffee/".to_string())]).to_string()
+        );
+    }
+
 }
