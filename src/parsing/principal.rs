@@ -51,8 +51,8 @@ impl<'de> Deserialize<'de> for Principal {
 
 impl Serialize for Principal {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
+        where
+            S: Serializer,
     {
         // 3 is the number of fields in the struct.
         serializer.serialize_str(&self.to_string())
