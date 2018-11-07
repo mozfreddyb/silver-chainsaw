@@ -2,13 +2,13 @@ use std::str::FromStr;
 use std::fmt;
 use serde_json::Error;
 use serde::de::{Deserialize, Deserializer, Visitor, Unexpected};
+use serde::ser::{Serialize, Serializer};
 use url::Url;
 
 
-#[derive(Debug, PartialEq, Serialize)]
+#[derive(Debug, PartialEq)]
 pub enum Principal {
     URLPrincipal(String),
-    ///XXX decide whether we need URL parsing/validation
     ExpandedPrincipal(Vec<Principal>),
     SystemPrincipal,
     NullPrincipal,
@@ -43,23 +43,19 @@ impl<'de> Deserialize<'de> for Principal {
                     }
                 }
             }
-
-            /*#[cfg(feature = "arbitrary_precision")]
-            #[inline]
-            fn visit_map<V>(self, mut visitor: V) -> Result<Principal, V::Error>
-            where
-                V: de::MapAccess<'de>,
-            {
-                let value = visitor.next_key::<PrincipalKey>()?;
-                if value.is_none() {
-                    return Err(de::Error::invalid_type(Unexpected::Map, &self));
-                }
-                let v: PrincipalFromString = visitor.next_value()?;
-                Ok(v.value)
-            }*/
         }
-
         deserializer.deserialize_any(PrincipalVisitor)
+    }
+}
+
+
+impl Serialize for Principal {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        // 3 is the number of fields in the struct.
+        serializer.serialize_str(&self.to_string())
     }
 }
 
@@ -114,14 +110,12 @@ impl fmt::Display for Principal {
                     t.push_str(&(u.to_string()));
                     if i > 1 {
                         t.push(' ');
-
                     }
                     i -= 1;
                 }
                 t.push_str("]]");
                 t
-
-            },
+            }
             Principal::URLPrincipal(u) => u.clone(),
         };
         write!(f, "{}", s)
@@ -192,7 +186,6 @@ mod tests_principal_from_str {
                 Principal::URLPrincipal("moz-extension://3767278d-dead-beef-be81-c0ffeec0ffee/".to_string())])
         );
     }
-
 }
 
 
@@ -258,5 +251,4 @@ mod tests_principal_to_str {
                 Principal::URLPrincipal("moz-extension://3767278d-dead-beef-be81-c0ffeec0ffee/".to_string())]).to_string()
         );
     }
-
 }
