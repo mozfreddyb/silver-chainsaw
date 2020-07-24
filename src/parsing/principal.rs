@@ -1,14 +1,13 @@
-use std::str::FromStr;
-use std::fmt;
-use serde_json::Error;
-use serde::de::{Deserialize, Deserializer, Visitor, Unexpected};
+use serde::de::{Deserialize, Deserializer, Unexpected, Visitor};
 use serde::ser::{Serialize, Serializer};
+use serde_json::Error;
+use std::fmt;
+use std::str::FromStr;
 use url::Url;
-
 
 #[derive(Debug, PartialEq)]
 pub enum Principal {
-    URLPrincipal(String),
+    ContentPrincipal(String),
     ExpandedPrincipal(Vec<Principal>),
     SystemPrincipal,
     NullPrincipal,
@@ -18,8 +17,8 @@ pub enum Principal {
 impl<'de> Deserialize<'de> for Principal {
     #[inline]
     fn deserialize<D>(deserializer: D) -> Result<Principal, D::Error>
-        where
-            D: Deserializer<'de>,
+    where
+        D: Deserializer<'de>,
     {
         struct PrincipalVisitor;
 
@@ -31,8 +30,8 @@ impl<'de> Deserialize<'de> for Principal {
             }
 
             fn visit_str<E>(self, value: &str) -> Result<Principal, E>
-                where
-                    E: serde::de::Error,
+            where
+                E: serde::de::Error,
             {
                 //Principal::from_str(value)
                 match Principal::from_str(value) {
@@ -48,11 +47,10 @@ impl<'de> Deserialize<'de> for Principal {
     }
 }
 
-
 impl Serialize for Principal {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where
-            S: Serializer,
+    where
+        S: Serializer,
     {
         // 3 is the number of fields in the struct.
         serializer.serialize_str(&self.to_string())
@@ -62,7 +60,8 @@ impl Serialize for Principal {
 impl FromStr for Principal {
     type Err = Error;
 
-    fn from_str(text: &str) -> Result<Self, Self::Err> { // serde::de::Error
+    fn from_str(text: &str) -> Result<Self, Self::Err> {
+        // serde::de::Error
         match text {
             "SystemPrincipal" => Ok(Principal::SystemPrincipal),
             "NullPrincipal" => Ok(Principal::NullPrincipal),
@@ -79,23 +78,28 @@ impl FromStr for Principal {
                         if p.is_ok() {
                             principals.push(p.unwrap());
                         } else {
-                            panic!("Error parsing inner principal in Expanded Principal: {}", &value);
+                            panic!(
+                                "Error parsing inner principal in Expanded Principal: {}",
+                                &value
+                            );
                         }
                     }
                     Ok(Principal::ExpandedPrincipal(principals))
                 } else {
                     let url = Url::parse(prin_str);
                     if url.is_ok() {
-                        Ok(Principal::URLPrincipal(url.unwrap().into_string()))
+                        Ok(Principal::ContentPrincipal(url.unwrap().into_string()))
                     } else {
-                        Err(serde::de::Error::invalid_type(Unexpected::Str("Error parsing into principal"), &prin_str))
+                        Err(serde::de::Error::invalid_type(
+                            Unexpected::Str("Error parsing into principal"),
+                            &prin_str,
+                        ))
                     }
                 }
             }
         }
     }
 }
-
 
 impl fmt::Display for Principal {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -116,12 +120,11 @@ impl fmt::Display for Principal {
                 t.push_str("]]");
                 t
             }
-            Principal::URLPrincipal(u) => u.clone(),
+            Principal::ContentPrincipal(u) => u.clone(),
         };
         write!(f, "{}", s)
     }
 }
-
 
 #[cfg(test)]
 mod tests_principal_from_str {
@@ -132,7 +135,7 @@ mod tests_principal_from_str {
     fn parse_http_url() {
         assert_eq!(
             Principal::from_str("http://example.com/").unwrap(),
-            Principal::URLPrincipal("http://example.com/".to_string())
+            Principal::ContentPrincipal("http://example.com/".to_string())
         );
     }
 
@@ -140,7 +143,7 @@ mod tests_principal_from_str {
     fn parse_about_url() {
         assert_eq!(
             Principal::from_str("about:config").unwrap(),
-            Principal::URLPrincipal("about:config".to_string())
+            Principal::ContentPrincipal("about:config".to_string())
         );
     }
 
@@ -161,7 +164,7 @@ mod tests_principal_from_str {
     fn parse_expanded_principal_1() {
         assert_eq!(
             Principal::from_str("[Expanded Principal [https://example.com/]]").unwrap(),
-            Principal::ExpandedPrincipal(vec![Principal::URLPrincipal(
+            Principal::ExpandedPrincipal(vec![Principal::ContentPrincipal(
                 "https://example.com/".to_string()
             )])
         );
@@ -172,8 +175,8 @@ mod tests_principal_from_str {
         assert_eq!(
             Principal::from_str("[Expanded Principal [moz-extension://3767278d-dead-beef-be81-c0ffeec0ffee/ https://example.com/]]").unwrap(),
             Principal::ExpandedPrincipal(vec![
-                Principal::URLPrincipal("moz-extension://3767278d-dead-beef-be81-c0ffeec0ffee/".to_string()),
-                Principal::URLPrincipal("https://example.com/".to_string())])
+                Principal::ContentPrincipal("moz-extension://3767278d-dead-beef-be81-c0ffeec0ffee/".to_string()),
+                Principal::ContentPrincipal("https://example.com/".to_string())])
         );
     }
 
@@ -182,12 +185,11 @@ mod tests_principal_from_str {
         assert_eq!(
             Principal::from_str("[Expanded Principal [https://example.com/ moz-extension://3767278d-dead-beef-be81-c0ffeec0ffee/]]").unwrap(),
             Principal::ExpandedPrincipal(vec![
-                Principal::URLPrincipal("https://example.com/".to_string()),
-                Principal::URLPrincipal("moz-extension://3767278d-dead-beef-be81-c0ffeec0ffee/".to_string())])
+                Principal::ContentPrincipal("https://example.com/".to_string()),
+                Principal::ContentPrincipal("moz-extension://3767278d-dead-beef-be81-c0ffeec0ffee/".to_string())])
         );
     }
 }
-
 
 #[cfg(test)]
 mod tests_principal_to_str {
@@ -197,7 +199,7 @@ mod tests_principal_to_str {
     fn parse_http_url() {
         assert_eq!(
             "http://example.com/",
-            Principal::URLPrincipal("http://example.com/".to_string()).to_string()
+            Principal::ContentPrincipal("http://example.com/".to_string()).to_string()
         );
     }
 
@@ -205,16 +207,13 @@ mod tests_principal_to_str {
     fn parse_about_url() {
         assert_eq!(
             "about:config",
-            Principal::URLPrincipal("about:config".to_string()).to_string()
+            Principal::ContentPrincipal("about:config".to_string()).to_string()
         );
     }
 
     #[test]
     fn parse_null_principal() {
-        assert_eq!(
-            "NullPrincipal",
-            Principal::NullPrincipal.to_string()
-        );
+        assert_eq!("NullPrincipal", Principal::NullPrincipal.to_string());
     }
 
     #[test]
@@ -226,9 +225,10 @@ mod tests_principal_to_str {
     fn parse_expanded_principal_1() {
         assert_eq!(
             "[Expanded Principal [https://example.com/]]",
-            Principal::ExpandedPrincipal(vec![Principal::URLPrincipal(
+            Principal::ExpandedPrincipal(vec![Principal::ContentPrincipal(
                 "https://example.com/".to_string()
-            )]).to_string()
+            )])
+            .to_string()
         );
     }
 
@@ -237,8 +237,8 @@ mod tests_principal_to_str {
         assert_eq!(
             "[Expanded Principal [moz-extension://3767278d-dead-beef-be81-c0ffeec0ffee/ https://example.com/]]",
             Principal::ExpandedPrincipal(vec![
-                Principal::URLPrincipal("moz-extension://3767278d-dead-beef-be81-c0ffeec0ffee/".to_string()),
-                Principal::URLPrincipal("https://example.com/".to_string())]).to_string()
+                Principal::ContentPrincipal("moz-extension://3767278d-dead-beef-be81-c0ffeec0ffee/".to_string()),
+                Principal::ContentPrincipal("https://example.com/".to_string())]).to_string()
         );
     }
 
@@ -247,8 +247,8 @@ mod tests_principal_to_str {
         assert_eq!(
             "[Expanded Principal [https://example.com/ moz-extension://3767278d-dead-beef-be81-c0ffeec0ffee/]]",
             Principal::ExpandedPrincipal(vec![
-                Principal::URLPrincipal("https://example.com/".to_string()),
-                Principal::URLPrincipal("moz-extension://3767278d-dead-beef-be81-c0ffeec0ffee/".to_string())]).to_string()
+                Principal::ContentPrincipal("https://example.com/".to_string()),
+                Principal::ContentPrincipal("moz-extension://3767278d-dead-beef-be81-c0ffeec0ffee/".to_string())]).to_string()
         );
     }
 }

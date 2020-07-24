@@ -1,10 +1,14 @@
-use super::regex::Regex;
+//use super::regex::Regex;
+//use strum;
+//use strum_macros;
 
 pub mod principal;
+//mod policytypes;
 
-use std::io::{Write, ErrorKind};
+//use std::io::{ErrorKind, Write};
 
-pub fn parse_into_contentpolicytype(id: usize) -> &'static str {
+#[cfg(test)]
+pub fn parse_id_into_contentpolicytype(id: usize) -> &'static str {
     let policytypes = include!("policytypes.in");
     if id < policytypes.len() {
         policytypes[id]
@@ -12,64 +16,104 @@ pub fn parse_into_contentpolicytype(id: usize) -> &'static str {
         "TYPE_UNKNOWN"
     }
 }
+/*pub fn parse_contentpolicytype(typestr: &str) -> &'static str{
+    let parsed = nsContentPolicyType::from_str(typestr);
+    return if let Ok(cpt) = parsed {
+        <&'static str>::from(cpt)
+    } else {
+        "TYPE_INVALID"
+    }
+}*/
 
 #[cfg(test)]
 mod tests {
-    use parsing::parse_into_contentpolicytype;
+    use crate::parsing::parse_id_into_contentpolicytype;
 
     #[test]
     fn policy_type_basic() {
-        assert_eq!(parse_into_contentpolicytype(9), "TYPE_XBL");
+        assert_eq!(parse_id_into_contentpolicytype(6), "TYPE_DOCUMENT");
     }
 
     #[test]
     fn policy_type_11_is_aliased() {
         assert_eq!(
-            parse_into_contentpolicytype(11),
+            parse_id_into_contentpolicytype(11),
             "TYPE_XMLHTTPREQUEST_OR_TYPE_DATAREQUEST"
         );
     }
 
     #[test]
     fn policy_type_array_oob() {
-        assert_eq!(parse_into_contentpolicytype(999), "TYPE_UNKNOWN");
+        assert_eq!(parse_id_into_contentpolicytype(999), "TYPE_UNKNOWN");
     }
 
     #[test]
     fn policy_type_array_end() {
-        assert_eq!(parse_into_contentpolicytype(45), "TYPE_UNKNOWN");
+        assert_eq!(parse_id_into_contentpolicytype(45), "TYPE_UNKNOWN");
     }
 }
 
+#[allow(non_snake_case)]
+#[allow(non_camel_case_types)]
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
-pub struct ContentSecurityCheck {
-    processtype: String,
-    channeluri: String,
-    http_method: String,
-    loadingprincipal: principal::Principal,
-    triggeringprincipal: principal::Principal,
-    principaltoinherit: principal::Principal,
-    redirectchain: Vec<String>,
-    internalcontentpolicytype: String,
-    externalcontentpolicytype: String,
-    upgradeinsecurerequests: bool,
-    initalsecuritychecksdone: bool,
-    enforcesecurity: bool,
+pub struct doContentSecurityCheck {
+    //processtype: String,
+    channelURI: String,
+    httpMethod: Option<String>,
+    loadingPrincipal: principal::Principal,
+    triggeringPrincipal: principal::Principal,
+    principalToInherit: principal::Principal,
+    redirectChain: Vec<String>,
+    internalContentPolicyType: String,
+    externalContentPolicyType: String,
+    upgradeInsecureRequests: bool,
+    initalSecurityChecksDone: bool,
+    allowDeprecatedSystemRequests: bool,
+    CSP: Vec<String>,
     securityflags: Vec<String>,
-    csp: Vec<String>
 }
 
-
-pub fn parse_log(text: &str, verbosity: u8, mut outfile: std::boxed::Box<dyn std::io::Write>) -> std::io::Result<()> {
+pub fn unprefixed_to_yaml(text: &str, _outfile: std::boxed::Box<dyn std::io::Write>) -> Result<(), serde_yaml::Error> {
     let lines = text.split('\n');
-    let mut blocks: Vec<ContentSecurityCheck> = vec![];
+    let mut block = String::new();
+    let mut scanning = false;
+    for line in lines {
+        if line == "#DebugDoContentSecurityCheck Begin" {
+            scanning = true;
+        }
+        if line == "#DebugDoContentSecurityCheck End" {
+            let _y: doContentSecurityCheck;
+            /*if let Ok(y) = serde_yaml::from_str(&block) {
+                println!("wow, input string.. {:?}", block);
+                println!("Wow, content policytypes.. {:?}", y);
+            }*/
+            block.clear();
+            scanning = false;
+        }
+        if scanning {
+            block += line;
+        }
+    }
+
+
+    Ok(())
+}
+
+/*pub fn parse_log(
+    text: &str,
+    verbosity: u8,
+    mut outfile: std::boxed::Box<dyn std::io::Write>,
+) -> std::io::Result<()> {
+    let lines = text.split('\n');
+    let mut blocks: Vec<doContentSecurityCheck> = vec![];
     let mut current_block: Vec<String> = vec![];
-    let is_csmlog_line = Regex::new(r"\[(Parent|Child) \d+: Main Thread]: \w+/CSMLog (.*)").unwrap();
+    let is_csmlog_line =
+        Regex::new(r"\[(Parent|Child) \d+: Main Thread]: \w+/CSMLog (.*)").unwrap();
     let needs_quotes = Regex::new(r"\s+(?P<key>[^:>]+):\s+(?P<value>.+)").unwrap();
     // used [a-zA-Z0-9?&#:/.\-_ \[\]] instead of .+ for value, looked to brittle.
     let mut collected_security_flags: Vec<String> = vec![];
     let mut collected_redirect_chain: Vec<String> = vec![];
-    let mut collected_csp : Vec<String> = vec![];
+    let mut collected_csp: Vec<String> = vec![];
     let mut processtype: &str;
     for line in lines {
         let captures = is_csmlog_line.captures(line);
@@ -84,12 +128,16 @@ pub fn parse_log(text: &str, verbosity: u8, mut outfile: std::boxed::Box<dyn std
                 let key = caps.get(1).unwrap().as_str(); //XXX
                 let normalized_key = key.to_lowercase().replace(" ", "_");
                 let value = caps.get(2).unwrap().as_str(); //XXX
-                // numeric value?
+                                                           // numeric value?
                 let is_numeric = value.parse::<usize>();
                 // enquote both:
                 let enquoted_line = if is_numeric.is_ok() {
                     if normalized_key.ends_with("contentpolicytype") {
-                        format!("\"{}\": \"{}\"", normalized_key, parse_into_contentpolicytype(is_numeric.unwrap()))
+                        format!(
+                            "\"{}\": \"{}\"",
+                            normalized_key,
+                            parse_id_into_contentpolicytype(is_numeric.unwrap())
+                        )
                     } else {
                         format!("\"{}\": {}", normalized_key, value)
                     }
@@ -102,10 +150,16 @@ pub fn parse_log(text: &str, verbosity: u8, mut outfile: std::boxed::Box<dyn std
             } else if logged_line == "}" {
                 current_block.push(format!("\"processtype\": \"{}\"", processtype));
                 // next block
-                let secflags = format!("\"securityflags\": [{}]", collected_security_flags.join(","));
+                let secflags = format!(
+                    "\"securityflags\": [{}]",
+                    collected_security_flags.join(",")
+                );
                 current_block.push(secflags);
 
-                let redirects = format!("\"redirectchain\": [{}]", collected_redirect_chain.join(","));
+                let redirects = format!(
+                    "\"redirectchain\": [{}]",
+                    collected_redirect_chain.join(",")
+                );
                 current_block.push(redirects);
 
                 let csp = format!("\"csp\": [{}]", collected_csp.join(","));
@@ -129,10 +183,12 @@ pub fn parse_log(text: &str, verbosity: u8, mut outfile: std::boxed::Box<dyn std
             } else if logged_line.contains("->:") {
                 // RedirectChain and securityFlags have items below, cant just be quoted values.
                 // need to collect array values
-                collected_redirect_chain.push(format!("\"{}\"", logged_line.replace("->:", "").trim()));
+                collected_redirect_chain
+                    .push(format!("\"{}\"", logged_line.replace("->:", "").trim()));
             } else if logged_line.contains("SEC_") {
                 collected_security_flags.push(format!("\"{}\"", logged_line.trim()));
-            } else if logged_line.starts_with("    ") { //FIXME dangerous pattern. get smarter.
+            } else if logged_line.starts_with("    ") {
+                //FIXME dangerous pattern. get smarter.
                 collected_csp.push(format!("\"{}\"", logged_line.trim()));
             }
         }
@@ -146,11 +202,17 @@ pub fn parse_log(text: &str, verbosity: u8, mut outfile: std::boxed::Box<dyn std
     let bytes = blocks_as_json.as_bytes();
     match outfile.write(bytes) {
         Ok(size) if size == bytes.len() => Ok(()),
-        Ok(0) | Ok(3) => Err(std::io::Error::new(ErrorKind::WriteZero, "Wrote only 0 bytes")),
-        Ok(_) => Err(std::io::Error::new(ErrorKind::Other, "Couldnt write file completely")),
+        Ok(0) | Ok(3) => Err(std::io::Error::new(
+            ErrorKind::WriteZero,
+            "Wrote only 0 bytes",
+        )),
+        Ok(_) => Err(std::io::Error::new(
+            ErrorKind::Other,
+            "Couldnt write file completely",
+        )),
         Err(e) => Err(e),
     }
-}
+}*/
 
 //pub fn parse
 // FIXME add tests for all parsing cases
