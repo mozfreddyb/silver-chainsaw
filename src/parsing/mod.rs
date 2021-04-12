@@ -2,22 +2,21 @@
 //use strum;
 //use strum_macros;
 
-pub mod principal;
 mod policytypes;
+pub mod principal;
 use crate::parsing::policytypes::nsContentPolicyType;
 use std::str::FromStr;
 
-
 //use std::io::{ErrorKind, Write};
 
-pub fn parse_contentpolicytype(typestr: &str) -> &'static str{
+pub fn parse_contentpolicytype(typestr: &str) -> &'static str {
     let parsed = nsContentPolicyType::from_str(typestr);
     return if let Ok(cpt) = parsed {
         let typestr: &'static str = cpt.into();
         return typestr;
     } else {
         "TYPE_UNKNOWN"
-    }
+    };
 }
 
 #[cfg(test)]
@@ -65,7 +64,10 @@ pub struct doContentSecurityCheck {
     securityflags: Vec<String>,
 }
 
-pub fn unprefixed_to_yaml(text: &str, _outfile: std::boxed::Box<dyn std::io::Write>) -> Result<(), serde_yaml::Error> {
+pub fn unprefixed_to_yaml(
+    text: &str,
+    _outfile: std::boxed::Box<dyn std::io::Write>,
+) -> Result<(), serde_yaml::Error> {
     let lines = text.split('\n');
     let mut block = String::new();
     let mut scanning = false;

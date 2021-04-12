@@ -1,3 +1,4 @@
+#![rustfmt::skip]
 /**
 Generated though:
 1) Verbatim copy of the `cenum nsContentPolicyType ..` block from
