@@ -11,12 +11,11 @@ use std::str::FromStr;
 
 pub fn parse_contentpolicytype(typestr: &str) -> &'static str {
     let parsed = nsContentPolicyType::from_str(typestr);
-    return if let Ok(cpt) = parsed {
-        let typestr: &'static str = cpt.into();
-        return typestr;
+    if let Ok(cpt) = parsed {
+        <&'static str>::from(cpt)
     } else {
         "TYPE_UNKNOWN"
-    };
+    }
 }
 
 #[cfg(test)]
@@ -76,7 +75,7 @@ pub fn unprefixed_to_yaml(
             scanning = true;
         }
         if line == "#DebugDoContentSecurityCheck End" {
-            let y: Result<doContentSecurityCheck, serde_yaml::Error> = serde_yaml::from_str(&block);
+            //let y: Result<doContentSecurityCheck, serde_yaml::Error> = serde_yaml::from_str(&block);
             block.clear();
             scanning = false;
         }

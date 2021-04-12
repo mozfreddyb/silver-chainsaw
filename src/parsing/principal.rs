@@ -74,27 +74,23 @@ impl FromStr for Principal {
                     let str_len = prin_str.len();
                     let inner = &prin_str[21..str_len - 2];
                     for value in inner.split(' ') {
-                        let p = Principal::from_str(value);
-                        if p.is_ok() {
-                            principals.push(p.unwrap());
+                        if let Ok(principal) = Principal::from_str(value) {
+                            principals.push(principal);
                         } else {
-                            panic!(
-                                "Error parsing inner principal in Expanded Principal: {}",
-                                &value
-                            );
+                            return Err(serde::de::Error::invalid_type(
+                                Unexpected::Str("Error parsing inner principal"),
+                                &value,
+                            ));
                         }
                     }
                     Ok(Principal::ExpandedPrincipal(principals))
+                } else if let Ok(url) = Url::parse(prin_str) {
+                    Ok(Principal::ContentPrincipal(url.into_string()))
                 } else {
-                    let url = Url::parse(prin_str);
-                    if url.is_ok() {
-                        Ok(Principal::ContentPrincipal(url.unwrap().into_string()))
-                    } else {
-                        Err(serde::de::Error::invalid_type(
-                            Unexpected::Str("Error parsing into principal"),
-                            &prin_str,
-                        ))
-                    }
+                    Err(serde::de::Error::invalid_type(
+                        Unexpected::Str("Error parsing into principal"),
+                        &prin_str,
+                    ))
                 }
             }
         }
