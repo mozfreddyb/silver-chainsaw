@@ -1,4 +1,4 @@
-/*
+/**
 Generated though:
 1) Verbatim copy of the `cenum nsContentPolicyType ..` block from
   https://searchfox.org/mozilla-central/source/dom/base/nsIContentPolicy.idl
@@ -6,13 +6,14 @@ Generated though:
 3)  and the derive() block
  */
 
-use strum;
-use strum_macros::EnumString;
+/// FIXME: Generate this with a build-time script
+
+use strum_macros::{EnumString, IntoStaticStr};
   /**
    * The type of nsIContentPolicy::TYPE_*
    */
   #[allow(non_camel_case_types)]
-  #[derive(Debug, PartialEq, EnumString, AsStaticStr)]
+  #[derive(Debug, PartialEq, EnumString, IntoStaticStr)]
   pub enum nsContentPolicyType {
     /**
      * Indicates a unset or bogus policy type.

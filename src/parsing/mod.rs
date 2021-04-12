@@ -3,53 +3,45 @@
 //use strum_macros;
 
 pub mod principal;
-//mod policytypes;
+mod policytypes;
+use crate::parsing::policytypes::nsContentPolicyType;
+use std::str::FromStr;
+
 
 //use std::io::{ErrorKind, Write};
 
-#[cfg(test)]
-pub fn parse_id_into_contentpolicytype(id: usize) -> &'static str {
-    let policytypes = include!("policytypes.in");
-    if id < policytypes.len() {
-        policytypes[id]
+pub fn parse_contentpolicytype(typestr: &str) -> &'static str{
+    let parsed = nsContentPolicyType::from_str(typestr);
+    return if let Ok(cpt) = parsed {
+        let typestr: &'static str = cpt.into();
+        return typestr;
     } else {
         "TYPE_UNKNOWN"
     }
 }
-/*pub fn parse_contentpolicytype(typestr: &str) -> &'static str{
-    let parsed = nsContentPolicyType::from_str(typestr);
-    return if let Ok(cpt) = parsed {
-        <&'static str>::from(cpt)
-    } else {
-        "TYPE_INVALID"
-    }
-}*/
 
 #[cfg(test)]
 mod tests {
-    use crate::parsing::parse_id_into_contentpolicytype;
+    use crate::parsing::parse_contentpolicytype;
 
     #[test]
     fn policy_type_basic() {
-        assert_eq!(parse_id_into_contentpolicytype(6), "TYPE_DOCUMENT");
+        assert_eq!(parse_contentpolicytype("TYPE_DOCUMENT"), "TYPE_DOCUMENT");
     }
 
     #[test]
-    fn policy_type_11_is_aliased() {
-        assert_eq!(
-            parse_id_into_contentpolicytype(11),
-            "TYPE_XMLHTTPREQUEST_OR_TYPE_DATAREQUEST"
-        );
+    fn policy_type_invalid_string() {
+        assert_eq!(parse_contentpolicytype("blergh"), "TYPE_UNKNOWN");
     }
 
     #[test]
-    fn policy_type_array_oob() {
-        assert_eq!(parse_id_into_contentpolicytype(999), "TYPE_UNKNOWN");
+    fn policy_type_empty_string() {
+        assert_eq!(parse_contentpolicytype(""), "TYPE_UNKNOWN");
     }
 
     #[test]
-    fn policy_type_array_end() {
-        assert_eq!(parse_id_into_contentpolicytype(45), "TYPE_UNKNOWN");
+    fn policy_type_as_number_str() {
+        assert_eq!(parse_contentpolicytype("11"), "TYPE_UNKNOWN");
     }
 }
 
@@ -59,17 +51,17 @@ mod tests {
 pub struct doContentSecurityCheck {
     //processtype: String,
     channelURI: String,
-    httpMethod: Option<String>,
+    httpMethod: Option<String>, // only shown for http channels
     loadingPrincipal: principal::Principal,
     triggeringPrincipal: principal::Principal,
     principalToInherit: principal::Principal,
-    redirectChain: Vec<String>,
+    redirectChain: Vec<String>, // key always present might be be empty value
     internalContentPolicyType: String,
     externalContentPolicyType: String,
     upgradeInsecureRequests: bool,
     initalSecurityChecksDone: bool,
     allowDeprecatedSystemRequests: bool,
-    CSP: Vec<String>,
+    CSP: Vec<String>, // key always present, might be empty value
     securityflags: Vec<String>,
 }
 
@@ -82,11 +74,7 @@ pub fn unprefixed_to_yaml(text: &str, _outfile: std::boxed::Box<dyn std::io::Wri
             scanning = true;
         }
         if line == "#DebugDoContentSecurityCheck End" {
-            let _y: doContentSecurityCheck;
-            /*if let Ok(y) = serde_yaml::from_str(&block) {
-                println!("wow, input string.. {:?}", block);
-                println!("Wow, content policytypes.. {:?}", y);
-            }*/
+            let y: Result<doContentSecurityCheck, serde_yaml::Error> = serde_yaml::from_str(&block);
             block.clear();
             scanning = false;
         }
@@ -94,8 +82,6 @@ pub fn unprefixed_to_yaml(text: &str, _outfile: std::boxed::Box<dyn std::io::Wri
             block += line;
         }
     }
-
-
     Ok(())
 }
 
