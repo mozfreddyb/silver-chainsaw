@@ -14,7 +14,7 @@ use strum_macros::{EnumString, IntoStaticStr};
    * The type of nsIContentPolicy::TYPE_*
    */
   #[allow(non_camel_case_types)]
-  #[derive(Debug, PartialEq, EnumString, IntoStaticStr)]
+  #[derive(Debug, PartialEq, EnumString, IntoStaticStr, Serialize, Deserialize)]
   pub enum nsContentPolicyType {
     /**
      * Indicates a unset or bogus policy type.

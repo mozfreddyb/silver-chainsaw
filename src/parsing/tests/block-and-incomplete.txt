@@ -1,0 +1,49 @@
+[Parent 17722: Main Thread]: D/CSMLog
+#DebugDoContentSecurityCheck Begin
+[Parent 17722: Main Thread]: V/CSMLog doContentSecurityCheck:
+[Parent 17722: Main Thread]: V/CSMLog   - channelURI: https://incoming.telemetry.mozilla.org/submit/telemetry/b0a4b2dc-c5b7-44ed-b0d4-41e01a9abf4e/bhr/Firefox/89.0a1/nightly/20210412213434?v=4
+[Parent 17722: Main Thread]: V/CSMLog   - httpMethod: POST
+[Parent 17722: Main Thread]: D/CSMLog   - loadingPrincipal: SystemPrincipal
+[Parent 17722: Main Thread]: D/CSMLog   - triggeringPrincipal: SystemPrincipal
+[Parent 17722: Main Thread]: D/CSMLog   - principalToInherit: nullptr
+[Parent 17722: Main Thread]: V/CSMLog   - redirectChain:
+[Parent 17722: Main Thread]: V/CSMLog   - internalContentPolicyType: TYPE_INTERNAL_XMLHTTPREQUEST
+[Parent 17722: Main Thread]: V/CSMLog   - externalContentPolicyType: TYPE_XMLHTTPREQUEST
+[Parent 17722: Main Thread]: V/CSMLog   - upgradeInsecureRequests: false
+[Parent 17722: Main Thread]: V/CSMLog   - initialSecurityChecksDone: false
+[Parent 17722: Main Thread]: V/CSMLog   - allowDeprecatedSystemRequests: false
+[Parent 17722: Main Thread]: D/CSMLog   - CSP:
+[Parent 17722: Main Thread]: V/CSMLog   - securityFlags:
+[Parent 17722: Main Thread]: V/CSMLog     - SEC_ALLOW_CROSS_ORIGIN_SEC_CONTEXT_IS_NULL
+[Parent 17722: Main Thread]: V/CSMLog     - SEC_COOKIES_INCLUDE
+[Parent 17722: Main Thread]: V/CSMLog     - SEC_COOKIES_SAME_ORIGIN
+[Parent 17722: Main Thread]: V/CSMLog     - SEC_COOKIES_OMIT
+[Parent 17722: Main Thread]: D/CSMLog
+#DebugDoContentSecurityCheck End
+[Parent 17722: Main Thread]: D/CSMLog
+#DebugDoContentSecurityCheck Begin
+[Parent 17722: Main Thread]: V/CSMLog doContentSecurityCheck:
+[Parent 17722: Main Thread]: V/CSMLog   - channelURI: https://incoming.telemetry.mozilla.org/submit/telemetry/5ce221c9-788e-4d6a-8fa3-7a1008d82354/bhr/Firefox/86.0a1/nightly/20210113213439?v=4
+[Parent 17722: Main Thread]: V/CSMLog   - httpMethod: POST
+[Parent 17722: Main Thread]: D/CSMLog   - loadingPrincipal: SystemPrincipal
+[Parent 17722: Main Thread]: D/CSMLog   - triggeringPrincipal: SystemPrincipal
+[Parent 17722: Main Thread]: D/CSMLog   - principalToInherit: nullptr
+[Parent 17722: Main Thread]: V/CSMLog   - redirectChain:
+[Parent 17722: Main Thread]: V/CSMLog   - internalContentPolicyType: TYPE_INTERNAL_XMLHTTPREQUEST
+[Parent 17722: Main Thread]: V/CSMLog   - externalContentPolicyType: TYPE_XMLHTTPREQUEST
+[Parent 17722: Main Thread]: V/CSMLog   - upgradeInsecureRequests: false
+[Parent 17722: Main Thread]: V/CSMLog   - initialSecurityChecksDone: false
+[Parent 17722: Main Thread]: V/CSMLog   - allowDeprecatedSystemRequests: false
+[Parent 17722: Main Thread]: D/CSMLog   - CSP:
+[Parent 17722: Main Thread]: V/CSMLog   - securityFlags:
+[Parent 17722: Main Thread]: V/CSMLog     - SEC_ALLOW_CROSS_ORIGIN_SEC_CONTEXT_IS_NULL
+[Parent 17722: Main Thread]: V/CSMLog     - SEC_COOKIES_INCLUDE
+[Parent 17722: Main Thread]: V/CSMLog     - SEC_COOKIES_SAME_ORIGIN
+[Parent 17722: Main Thread]: V/CSMLog     - SEC_COOKIES_OMIT
+[Parent 17722: Main Thread]: D/CSMLog
+#DebugDoContentSecurityCheck End
+[Parent 17722: Main Thread]: D/CSMLog
+#DebugDoContentSecurityCheck Begin
+[Parent 17722: Main Thread]: V/CSMLog doContentSecurityCheck:
+[Parent 17722: Main Thread]: V/CSMLog   - channelURI: resource://gre/modules/TelemetryScheduler.jsm
+[Par

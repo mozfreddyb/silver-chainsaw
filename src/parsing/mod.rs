@@ -2,12 +2,20 @@
 //use strum;
 //use strum_macros;
 
+mod checktypes;
 mod policytypes;
 pub mod principal;
-use crate::parsing::policytypes::nsContentPolicyType;
-use std::str::FromStr;
+mod tests;
 
-//use std::io::{ErrorKind, Write};
+use crate::parsing::checktypes::{CheckLine, ContentSecurityCheck, WrappedCheck};
+use crate::parsing::policytypes::nsContentPolicyType;
+use log::{debug, error, info, warn};
+use regex;
+use regex::Regex;
+use std::io::{BufRead, ErrorKind, Lines};
+use std::str::FromStr;
+use std::thread::current;
+use url::form_urlencoded::parse;
 
 pub fn parse_contentpolicytype(typestr: &str) -> &'static str {
     let parsed = nsContentPolicyType::from_str(typestr);
@@ -18,8 +26,130 @@ pub fn parse_contentpolicytype(typestr: &str) -> &'static str {
     }
 }
 
+/*pub fn unprefixed_to_yaml(
+    text: &str,
+    _outfile: std::boxed::Box<dyn std::io::Write>,
+) -> Result<(), serde_yaml::Error> {
+    let lines = text.split('\n');
+
+    let mut block: Vec<&str> = vec![];
+    let mut scanning = false;
+    for line in lines {
+        if line == "#DebugDoContentSecurityCheck Begin" {
+            scanning = true;
+        }
+        if line == "#DebugDoContentSecurityCheck End" {
+            //let y: Result<doContentSecurityCheck, serde_yaml::Error> = serde_yaml::from_str(&block);
+            block.clear();
+            scanning = false;
+        }
+        if scanning {
+            block.append(line);
+        }
+    }
+    Ok(())
+}*/
+
+pub fn parsed_content_security_check(
+    process_type: ProcessType,
+    block: Vec<String>,
+) -> Result<ContentSecurityCheck, serde_yaml::Error> {
+    let le_block = block.join("\n");
+    let deserialized: WrappedCheck = serde_yaml::from_str::<WrappedCheck>(&le_block)?;
+    let as_lines: Vec<CheckLine> = deserialized.doContentSecurityCheck;
+    let mut check = ContentSecurityCheck::from(as_lines);
+    check.process_type = process_type;
+    Ok(check)
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub enum ProcessType {
+    Child,
+    Parent,
+    Unknown,
+}
+
+pub fn parse_log(
+    reader: std::boxed::Box<dyn std::io::BufRead>,
+    //    mut outfile: std::boxed::Box<dyn std::io::Write>,
+) -> std::io::Result<Vec<ContentSecurityCheck>> {
+    const BEGIN_BLOCK: &str = "#DebugDoContentSecurityCheck Begin";
+    const END_BLOCK: &str = "#DebugDoContentSecurityCheck End";
+    let lines = reader.lines().map(|l| l.unwrap());
+    let mut blocks: Vec<ContentSecurityCheck> = vec![];
+    let mut current_block: Vec<String> = Vec::with_capacity(30);
+    let mut within_block = false;
+    let mut linecnt = 0;
+    let is_csmlog_line =
+        Regex::new(r"\[(Parent|Child) \d+: Main Thread]: (V|D)/CSMLog (.*)").unwrap();
+    let mut process_type = ProcessType::Unknown;
+    for line in lines {
+        // TODO investigate if we can use == instead of contains(). should be cheaper.
+        if line == BEGIN_BLOCK {
+            linecnt += 1;
+            within_block = true;
+            continue;
+        } else if line == END_BLOCK {
+            within_block = false;
+            if let Ok(parsed_block) =
+                parsed_content_security_check(process_type, current_block.clone())
+            {
+                blocks.push(parsed_block);
+            } else {
+                error!(
+                    "We had to skip a block, because it was not parsable:\n--\n{}\n--",
+                    current_block.join("\n")
+                );
+            }
+            current_block.clear();
+            // emit formerly collected block
+        }
+        if within_block {
+            // append to current block
+            let captures = is_csmlog_line.captures(&line);
+            // 0 = all, 1 = parent/child, 2 = after CSMLog
+            if captures.is_some() {
+                let caps = captures.unwrap();
+                let process_type_str = caps.get(1).unwrap().as_str();
+                process_type = match process_type_str {
+                    "Child" => ProcessType::Child,
+                    "Parent" => ProcessType::Parent,
+                    _ => {
+                        warn!(
+                            "Noticed unknown string for process type: {}",
+                            process_type_str
+                        );
+                        ProcessType::Unknown
+                    }
+                };
+                let logged_line = caps.get(3).unwrap().as_str();
+                current_block.push(String::from(logged_line));
+            } else {
+                // We are ignoring csmlog lines that aren't part of a security check.
+                // can turn this into an info!() logging call, eventually.
+                warn!("skipping line that isn't a valid csmlog line: {}", line);
+            }
+        }
+    }
+    info!(
+        "Finished parsing {} lines and received {} blocks",
+        linecnt,
+        blocks.len()
+    );
+    Ok(blocks)
+}
+
+//pub fn parse
+// FIXME add tests for all parsing cases
+
+// TODO:
+// add code & tests to identify & scan security flags (for now, should just take them as literal strings!)
+// add code & tests for a checkblock, with an enum like Principal to get blocks
+// -- this checkblock should also contain the pid & thread info
+// add code & tests to identify a checkblock in the first place
+
 #[cfg(test)]
-mod tests {
+mod tests_parse_contentpolicytype {
     use crate::parsing::parse_contentpolicytype;
 
     #[test]
@@ -42,170 +172,59 @@ mod tests {
         assert_eq!(parse_contentpolicytype("11"), "TYPE_UNKNOWN");
     }
 }
+#[cfg(test)]
+mod tests_parse_lines_into_content_security_check_block {
+    use crate::parsing::checktypes::{CheckLine, WrappedCheck};
+    use crate::parsing::policytypes::nsContentPolicyType;
+    use crate::parsing::{
+        parse_log, parsed_content_security_check, principal, tests, ContentSecurityCheck,
+        ProcessType,
+    };
 
-#[allow(non_snake_case)]
-#[allow(non_camel_case_types)]
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
-pub struct doContentSecurityCheck {
-    //processtype: String,
-    channelURI: String,
-    httpMethod: Option<String>, // only shown for http channels
-    loadingPrincipal: principal::Principal,
-    triggeringPrincipal: principal::Principal,
-    principalToInherit: principal::Principal,
-    redirectChain: Vec<String>, // key always present might be be empty value
-    internalContentPolicyType: String,
-    externalContentPolicyType: String,
-    upgradeInsecureRequests: bool,
-    initalSecurityChecksDone: bool,
-    allowDeprecatedSystemRequests: bool,
-    CSP: Vec<String>, // key always present, might be empty value
-    securityflags: Vec<String>,
+    use serde::de::Error;
+    use serde::{Deserialize, Serialize};
+    use std::collections::HashMap;
+    use std::io::BufReader;
+    use std::iter::Map;
+
+    #[test]
+    fn parse_simple_block_manually() {
+        let block_slices: Vec<&str> = tests::fixtures::SAMPLE_BLOCK.split('\n').collect();
+        let mut block: Vec<String> = Vec::with_capacity(block_slices.len());
+        for b in block_slices {
+            block.push(b.to_owned());
+        }
+        let le_block = block.join("\n");
+        let deserialized: Result<WrappedCheck, _> = serde_yaml::from_str::<WrappedCheck>(&le_block);
+        assert!(deserialized.is_ok());
+        let wrapped = deserialized.unwrap();
+        let checky: Vec<CheckLine> = wrapped.doContentSecurityCheck;
+        let check: ContentSecurityCheck = ContentSecurityCheck::from(checky);
+        assert_eq!(check.http_method, Some("POST".to_string()));
+    }
+    fn test_parse_content_security_check_simple_block() {
+        let block_slices: Vec<&str> = tests::fixtures::SAMPLE_BLOCK.split('\n').collect();
+        let mut block: Vec<String> = Vec::with_capacity(block_slices.len());
+        let p = ProcessType::Child;
+        let check = parsed_content_security_check(p, block);
+        assert!(check.is_ok());
+        assert_eq!(check.unwrap().process_type, p);
+    }
 }
 
-pub fn unprefixed_to_yaml(
-    text: &str,
-    _outfile: std::boxed::Box<dyn std::io::Write>,
-) -> Result<(), serde_yaml::Error> {
-    let lines = text.split('\n');
-    let mut block = String::new();
-    let mut scanning = false;
-    for line in lines {
-        if line == "#DebugDoContentSecurityCheck Begin" {
-            scanning = true;
-        }
-        if line == "#DebugDoContentSecurityCheck End" {
-            //let y: Result<doContentSecurityCheck, serde_yaml::Error> = serde_yaml::from_str(&block);
-            block.clear();
-            scanning = false;
-        }
-        if scanning {
-            block += line;
-        }
+#[cfg(test)]
+mod tests_parse_log {
+    use crate::parsing::parse_log;
+    use std::io::BufReader;
+    #[test]
+    fn parse_file_incomplete_block() {
+        let f = "src/parsing/tests/block-and-incomplete.txt";
+        let h = std::fs::File::open(f).unwrap();
+        let bufreader = BufReader::new(h);
+        let result = parse_log(Box::new(bufreader)).unwrap();
+        assert_eq!(result.len(), 2);
+        /*for c in result {
+            println!("{:?}", c);
+        }*/
     }
-    Ok(())
 }
-
-/*pub fn parse_log(
-    text: &str,
-    verbosity: u8,
-    mut outfile: std::boxed::Box<dyn std::io::Write>,
-) -> std::io::Result<()> {
-    let lines = text.split('\n');
-    let mut blocks: Vec<doContentSecurityCheck> = vec![];
-    let mut current_block: Vec<String> = vec![];
-    let is_csmlog_line =
-        Regex::new(r"\[(Parent|Child) \d+: Main Thread]: \w+/CSMLog (.*)").unwrap();
-    let needs_quotes = Regex::new(r"\s+(?P<key>[^:>]+):\s+(?P<value>.+)").unwrap();
-    // used [a-zA-Z0-9?&#:/.\-_ \[\]] instead of .+ for value, looked to brittle.
-    let mut collected_security_flags: Vec<String> = vec![];
-    let mut collected_redirect_chain: Vec<String> = vec![];
-    let mut collected_csp: Vec<String> = vec![];
-    let mut processtype: &str;
-    for line in lines {
-        let captures = is_csmlog_line.captures(line);
-        // 0 = all, 1 = parend/child, 2 = after CSMLog
-        if captures.is_some() {
-            let caps = captures.unwrap();
-            processtype = caps.get(1).unwrap().as_str();
-            let logged_line = caps.get(2).unwrap().as_str(); //XXX
-            let quotes_required = needs_quotes.captures(logged_line);
-            if quotes_required.is_some() {
-                let caps = quotes_required.unwrap();
-                let key = caps.get(1).unwrap().as_str(); //XXX
-                let normalized_key = key.to_lowercase().replace(" ", "_");
-                let value = caps.get(2).unwrap().as_str(); //XXX
-                                                           // numeric value?
-                let is_numeric = value.parse::<usize>();
-                // enquote both:
-                let enquoted_line = if is_numeric.is_ok() {
-                    if normalized_key.ends_with("contentpolicytype") {
-                        format!(
-                            "\"{}\": \"{}\"",
-                            normalized_key,
-                            parse_id_into_contentpolicytype(is_numeric.unwrap())
-                        )
-                    } else {
-                        format!("\"{}\": {}", normalized_key, value)
-                    }
-                } else if value == "true" || value == "false" {
-                    format!("\"{}\": {}", normalized_key, value)
-                } else {
-                    format!("\"{}\": \"{}\"", normalized_key, value)
-                };
-                current_block.push(enquoted_line);
-            } else if logged_line == "}" {
-                current_block.push(format!("\"processtype\": \"{}\"", processtype));
-                // next block
-                let secflags = format!(
-                    "\"securityflags\": [{}]",
-                    collected_security_flags.join(",")
-                );
-                current_block.push(secflags);
-
-                let redirects = format!(
-                    "\"redirectchain\": [{}]",
-                    collected_redirect_chain.join(",")
-                );
-                current_block.push(redirects);
-
-                let csp = format!("\"csp\": [{}]", collected_csp.join(","));
-                current_block.push(csp);
-
-                let json = format!("{{  {}  }}", current_block.join(","));
-                //eprintln!("JSON attempt {}", &json);
-                let parsed_json = serde_json::from_str(&json);
-                if parsed_json.is_ok() {
-                    let block = parsed_json.unwrap();
-                    //eprintln!("\n\nBlock {:?}", &block);
-                    blocks.push(block);
-                    current_block = vec![];
-                    collected_security_flags = vec![];
-                    collected_redirect_chain = vec![];
-                    collected_csp = vec![];
-                } else {
-                    eprintln!("this should be json {}", &json);
-                    panic!("Couldnt parse json: {:?}", parsed_json);
-                }
-            } else if logged_line.contains("->:") {
-                // RedirectChain and securityFlags have items below, cant just be quoted values.
-                // need to collect array values
-                collected_redirect_chain
-                    .push(format!("\"{}\"", logged_line.replace("->:", "").trim()));
-            } else if logged_line.contains("SEC_") {
-                collected_security_flags.push(format!("\"{}\"", logged_line.trim()));
-            } else if logged_line.starts_with("    ") {
-                //FIXME dangerous pattern. get smarter.
-                collected_csp.push(format!("\"{}\"", logged_line.trim()));
-            }
-        }
-    }
-    let blocks_as_json = serde_json::to_string(&blocks).unwrap();
-    //println!("Finished parsing {} blocks.\nWritten to parsed.json.", blocks.len());
-    if verbosity >= 1 {
-        eprintln!("{:?}", blocks_as_json);
-    }
-
-    let bytes = blocks_as_json.as_bytes();
-    match outfile.write(bytes) {
-        Ok(size) if size == bytes.len() => Ok(()),
-        Ok(0) | Ok(3) => Err(std::io::Error::new(
-            ErrorKind::WriteZero,
-            "Wrote only 0 bytes",
-        )),
-        Ok(_) => Err(std::io::Error::new(
-            ErrorKind::Other,
-            "Couldnt write file completely",
-        )),
-        Err(e) => Err(e),
-    }
-}*/
-
-//pub fn parse
-// FIXME add tests for all parsing cases
-
-// TODO:
-// add code & tests to identify & scan security flags (for now, should just take them as literal strings!)
-// add code & tests for a checkblock, with an enum like Principal to get blocks
-// -- this checkblock should also contain the pid & thread info
-// add code & tests to identify a checkblock in the first place

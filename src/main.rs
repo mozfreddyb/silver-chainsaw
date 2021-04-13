@@ -7,13 +7,12 @@ extern crate serde;
 extern crate serde_json;
 extern crate url;
 
+use env_logger;
 use getopts::Options;
 use std::env;
 use std::fs::File;
 use std::io;
-//use std::io::prelude::*;
 use std::io::Read;
-
 mod parsing;
 
 fn print_usage(program: &str, opts: &Options) {
@@ -22,6 +21,7 @@ fn print_usage(program: &str, opts: &Options) {
 }
 
 fn main() -> io::Result<()> {
+    env_logger::init();
     // arg parsing
     let args: Vec<_> = env::args().collect();
     let program = args[0].clone();
@@ -67,13 +67,5 @@ fn main() -> io::Result<()> {
         Some(f) => Box::new(File::create(f)?),
         None => Box::new(io::stdout()),
     };
-
-    if let Ok(_y) = parsing::unprefixed_to_yaml(&contents, outhandle) {
-        Ok(())
-    } else {
-        eprintln!("whoa parsing error meh");
-        Ok(())
-    }
-
-    //parsing::parse_log(&contents, verbosity_lvl, outhandle)
+    Ok(())
 }
