@@ -18,4 +18,23 @@ pub(crate) mod fixtures {
     - SEC_COOKIES_INCLUDE
     - SEC_COOKIES_SAME_ORIGIN
     - SEC_COOKIES_OMIT";
+
+    pub(crate) const REDIRECT_CSP_BLOCK: &str = r#"doContentSecurityCheck:
+      - channelURI: https://www.raspberrypi.org/
+      - httpMethod: GET
+      - loadingPrincipal: https://www.raspberrypi.org/blog/edge-impulse-and-tinyml-on-raspberry-pi/
+      - triggeringPrincipal: https://www.raspberrypi.org/blog/edge-impulse-and-tinyml-on-raspberry-pi/
+      - principalToInherit: nullptr
+      - redirectChain:
+        -: https://www.raspberrypi.org/?wordfence_syncAttackData=14.395
+      - internalContentPolicyType: TYPE_INTERNAL_SCRIPT_PRELOAD
+      - externalContentPolicyType: TYPE_SCRIPT
+      - upgradeInsecureRequests: true
+      - initialSecurityChecksDone: true
+      - allowDeprecatedSystemRequests: false
+      - CSP:
+        - "upgrade-insecure-requests; default-src https: data: 'unsafe-inline' 'unsafe-eval'; img-src https: 'self' blob: data:; report-uri https://e4f0000014a954844abf8fe208613d8.report-uri.com/r/d/csp/enforce"
+      - securityFlags:
+        - SEC_ALLOW_CROSS_ORIGIN_SEC_CONTEXT_IS_NULL
+        - SEC_ALLOW_CHROME"#;
 }

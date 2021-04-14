@@ -179,6 +179,17 @@ mod tests_parse_lines_into_content_security_check_block {
         assert!(check.is_ok());
         assert_eq!(check.unwrap().process_type, p);
     }
+    #[test]
+    fn test_parse_content_security_check_w_redirectchain() {
+        let block_slices: Vec<&str> = tests::fixtures::REDIRECT_CSP_BLOCK.split('\n').collect();
+        let mut block: Vec<String> = Vec::with_capacity(block_slices.len());
+        for b in block_slices {
+            block.push(b.to_owned());
+        }
+        let p = ProcessType::Unknown;
+        let check = parsed_content_security_check(p, block);
+        assert!(check.is_ok());
+    }
 }
 
 #[cfg(test)]
