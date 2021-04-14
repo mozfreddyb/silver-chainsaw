@@ -1,4 +1,5 @@
 #![rustfmt::skip]
+#![allow(clippy::upper_case_acronyms)]
 /**
 Generated though:
 1) Verbatim copy of the `cenum nsContentPolicyType ..` block from

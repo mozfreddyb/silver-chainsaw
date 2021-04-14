@@ -7,12 +7,17 @@ extern crate serde;
 extern crate serde_json;
 extern crate url;
 
+use crate::parsing::checktypes::ContentSecurityCheck;
+use crate::parsing::parse_log;
+use crate::parsing::policytypes::nsContentPolicyType;
+use crate::parsing::principal::Principal;
 
 use getopts::Options;
+use log::info;
 use std::env;
-use std::fs::File;
 use std::io;
-use std::io::Read;
+use std::io::BufReader;
+
 mod parsing;
 
 fn print_usage(program: &str, opts: &Options) {
@@ -29,10 +34,10 @@ fn main() -> io::Result<()> {
     opts.optflag("v", "verbose", "give more verbose output");
     opts.optflag("h", "help", "print usage info");
     opts.optopt(
-        "o",
-        "output",
-        "print to this file (default is stdout)",
-        "OUTFILE",
+        "d",
+        "dir",
+        "read files matching moz_log from this directory",
+        "DIRECTORY",
     );
     opts.optmulti("i", "input", "read from these files", "INFILE");
     //let mut verbosity_lvl = 0;
@@ -44,10 +49,48 @@ fn main() -> io::Result<()> {
         print_usage(&program, &opts);
         return Ok(());
     }
-    /*if matches.opt_present("v") {
-        verbosity_lvl = 1;
-    }*/
-    let input_file_names = matches.opt_strs("i");
+    let mut happyblocks: Vec<ContentSecurityCheck> = vec![];
+
+    let diropt = matches.opt_str("d");
+
+    if let Some(dirname) = diropt {
+        println!("Scanning {}", dirname);
+        for entry in std::fs::read_dir(dirname)? {
+            if let Ok(entry) = entry {
+                if let Ok(file_type) = entry.file_type() {
+                    // Now let's show our entry's file type!
+                    if file_type.is_file() {
+                        let file_name = entry.path();
+                        if file_name.to_str().unwrap().ends_with(".moz_log") {
+                            let h = std::fs::File::open(file_name).unwrap();
+                            let bufreader = BufReader::new(h);
+                            if let Ok(mut moar_checks) = parse_log(Box::new(bufreader)) {
+                                happyblocks.append(&mut moar_checks);
+                            }
+                        } else {
+                            info!("Skipping ineligible file {:?}", file_name);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // now comes the cool analysis, I guess
+    println!("happyblocks length: {}", happyblocks.len());
+    for c in happyblocks {
+        if c.channel_uri.starts_with("data:")
+            && !c.channel_uri.starts_with("data:text/css;extension=style;")
+            && c.loading_principal == Principal::SystemPrincipal
+            && (c.external_content_policy_type == nsContentPolicyType::TYPE_SCRIPT
+                || c.external_content_policy_type == nsContentPolicyType::TYPE_STYLESHEET)
+        {
+            println!("{:?}", c);
+        }
+    }
+    println!("that's all that were interesting.");
+    // TODO: parse every -i <file> and add to happyblocks
+    /*let input_file_names = matches.opt_strs("i");
     let mut contents = String::new();
 
     if input_file_names.is_empty() {
@@ -58,14 +101,7 @@ fn main() -> io::Result<()> {
             let mut file = File::open(inputname)?;
             file.read_to_string(&mut contents)?;
         }
-    }
-    if contents.is_empty() {
-        eprintln!("Warning: Empty input file!");
-    }
-    let output_file_name = matches.opt_str("o");
-    let _outhandle: Box<dyn io::Write> = match output_file_name {
-        Some(f) => Box::new(File::create(f)?),
-        None => Box::new(io::stdout()),
-    };
+    }*/
+
     Ok(())
 }

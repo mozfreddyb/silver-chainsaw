@@ -2,8 +2,8 @@
 //use strum;
 //use strum_macros;
 
-mod checktypes;
-mod policytypes;
+pub(crate) mod checktypes;
+pub(crate) mod policytypes;
 pub mod principal;
 mod tests;
 
@@ -23,30 +23,6 @@ pub fn parse_contentpolicytype(typestr: &str) -> &'static str {
         "TYPE_UNKNOWN"
     }
 }
-
-/*pub fn unprefixed_to_yaml(
-    text: &str,
-    _outfile: std::boxed::Box<dyn std::io::Write>,
-) -> Result<(), serde_yaml::Error> {
-    let lines = text.split('\n');
-
-    let mut block: Vec<&str> = vec![];
-    let mut scanning = false;
-    for line in lines {
-        if line == "#DebugDoContentSecurityCheck Begin" {
-            scanning = true;
-        }
-        if line == "#DebugDoContentSecurityCheck End" {
-            //let y: Result<doContentSecurityCheck, serde_yaml::Error> = serde_yaml::from_str(&block);
-            block.clear();
-            scanning = false;
-        }
-        if scanning {
-            block.append(line);
-        }
-    }
-    Ok(())
-}*/
 
 pub fn parsed_content_security_check(
     process_type: ProcessType,
@@ -106,8 +82,8 @@ pub fn parse_log(
             // append to current block
             let captures = is_csmlog_line.captures(&line);
             // 0 = all, 1 = parent/child, 2 = after CSMLog
-            if captures.is_some() {
-                let caps = captures.unwrap();
+            if let Some(caps) = captures {
+                //let caps = captures.unwrap();
                 let process_type_str = caps.get(1).unwrap().as_str();
                 process_type = match process_type_str {
                     "Child" => ProcessType::Child,
@@ -174,10 +150,7 @@ mod tests_parse_contentpolicytype {
 mod tests_parse_lines_into_content_security_check_block {
     use crate::parsing::checktypes::{CheckLine, WrappedCheck};
 
-    use crate::parsing::{
-        parse_log, parsed_content_security_check, principal, tests, ContentSecurityCheck,
-        ProcessType,
-    };
+    use crate::parsing::{parsed_content_security_check, tests, ContentSecurityCheck, ProcessType};
 
     #[test]
     fn parse_simple_block_manually() {
@@ -194,9 +167,13 @@ mod tests_parse_lines_into_content_security_check_block {
         let check: ContentSecurityCheck = ContentSecurityCheck::from(checky);
         assert_eq!(check.http_method, Some("POST".to_string()));
     }
+    #[test]
     fn test_parse_content_security_check_simple_block() {
         let block_slices: Vec<&str> = tests::fixtures::SAMPLE_BLOCK.split('\n').collect();
-        let block: Vec<String> = Vec::with_capacity(block_slices.len());
+        let mut block: Vec<String> = Vec::with_capacity(block_slices.len());
+        for b in block_slices {
+            block.push(b.to_owned());
+        }
         let p = ProcessType::Child;
         let check = parsed_content_security_check(p, block);
         assert!(check.is_ok());

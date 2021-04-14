@@ -1,3 +1,4 @@
+#![allow(clippy::upper_case_acronyms)]
 use crate::parsing::policytypes::nsContentPolicyType;
 use crate::parsing::principal::Principal;
 use crate::parsing::ProcessType;
