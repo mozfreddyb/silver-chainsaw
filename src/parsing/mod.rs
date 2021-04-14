@@ -9,13 +9,11 @@ mod tests;
 
 use crate::parsing::checktypes::{CheckLine, ContentSecurityCheck, WrappedCheck};
 use crate::parsing::policytypes::nsContentPolicyType;
-use log::{debug, error, info, warn};
-use regex;
+use log::{error, info, warn};
+
 use regex::Regex;
-use std::io::{BufRead, ErrorKind, Lines};
+use std::io::BufRead;
 use std::str::FromStr;
-use std::thread::current;
-use url::form_urlencoded::parse;
 
 pub fn parse_contentpolicytype(typestr: &str) -> &'static str {
     let parsed = nsContentPolicyType::from_str(typestr);
@@ -175,17 +173,11 @@ mod tests_parse_contentpolicytype {
 #[cfg(test)]
 mod tests_parse_lines_into_content_security_check_block {
     use crate::parsing::checktypes::{CheckLine, WrappedCheck};
-    use crate::parsing::policytypes::nsContentPolicyType;
+
     use crate::parsing::{
         parse_log, parsed_content_security_check, principal, tests, ContentSecurityCheck,
         ProcessType,
     };
-
-    use serde::de::Error;
-    use serde::{Deserialize, Serialize};
-    use std::collections::HashMap;
-    use std::io::BufReader;
-    use std::iter::Map;
 
     #[test]
     fn parse_simple_block_manually() {
@@ -204,7 +196,7 @@ mod tests_parse_lines_into_content_security_check_block {
     }
     fn test_parse_content_security_check_simple_block() {
         let block_slices: Vec<&str> = tests::fixtures::SAMPLE_BLOCK.split('\n').collect();
-        let mut block: Vec<String> = Vec::with_capacity(block_slices.len());
+        let block: Vec<String> = Vec::with_capacity(block_slices.len());
         let p = ProcessType::Child;
         let check = parsed_content_security_check(p, block);
         assert!(check.is_ok());

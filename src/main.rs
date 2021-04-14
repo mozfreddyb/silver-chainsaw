@@ -7,7 +7,7 @@ extern crate serde;
 extern crate serde_json;
 extern crate url;
 
-use env_logger;
+
 use getopts::Options;
 use std::env;
 use std::fs::File;
@@ -63,7 +63,7 @@ fn main() -> io::Result<()> {
         eprintln!("Warning: Empty input file!");
     }
     let output_file_name = matches.opt_str("o");
-    let outhandle: Box<dyn io::Write> = match output_file_name {
+    let _outhandle: Box<dyn io::Write> = match output_file_name {
         Some(f) => Box::new(File::create(f)?),
         None => Box::new(io::stdout()),
     };
